@@ -35,7 +35,6 @@ This repository is structured around a three-phase deep learning and telematics 
 │   ├── config.py        # Configuration management
 │   └── defaults.yml     # Default configuration values (paths, YOLO hyperparameters)
 ├── notebooks/
-│   ├── grounded-sam-2-auto-label.ipynb  # Foundation model auto-labeling pipeline
 │   ├── data_annotation.ipynb            # Do annotations for rest of dataset images (not implimented)
 │   ├── potholes.ipynb                   # Baseline experimental notebook
 │   ├── potholes_v8n.ipynb               # YOLOv8n training & evaluation
