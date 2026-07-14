@@ -144,7 +144,45 @@ def subsample_negatives(root, country, keep_ratio=1.5, seed=42):
         f"{len(neg_to_drop)} negatives removed"
     )
     
+def split_and_copy(
+    drive_root,
+    country,
+    final_train_img,
+    final_train_lbl,
+    final_val_img,
+    final_val_lbl,
+    val_ratio=0.15,
+):
+    """
+    Split one country's images and labels into train and validation sets,
+    then copy them into the unified dataset directories.
+    """
+    img_dir = Path(drive_root) / "train" / country / "images"
+    lbl_dir = Path(drive_root) / "train" / country / "labels"
 
+    img_files = list(img_dir.glob("*.jpg"))
+    random.shuffle(img_files)
+
+    n_val = int(len(img_files) * val_ratio)
+
+    train_files = img_files[n_val:]
+    val_files = img_files[:n_val]
+
+    for f in train_files:
+        shutil.copy(f, final_train_img / f"{country}_{f.name}")
+
+        lbl = lbl_dir / f"{f.stem}.txt"
+        if lbl.exists():
+            shutil.copy(lbl, final_train_lbl / f"{country}_{f.stem}.txt")
+
+    for f in val_files:
+        shutil.copy(f, final_val_img / f"{country}_{f.name}")
+
+        lbl = lbl_dir / f"{f.stem}.txt"
+        if lbl.exists():
+            shutil.copy(lbl, final_val_lbl / f"{country}_{f.stem}.txt")
+
+    print(f"{country}: {len(train_files)} train, {len(val_files)} val")
 def query(data: Union[pd.DataFrame, Any]) -> str:
     """Request user input for some aspect of the data."""
     raise NotImplementedError
