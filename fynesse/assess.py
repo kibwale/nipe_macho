@@ -1,7 +1,7 @@
 from typing import Any, Union
 import pandas as pd
 import logging
-
+import random
 from .config import *
 from . import access
 
@@ -98,6 +98,25 @@ def data() -> Union[pd.DataFrame, Any]:
         return None
 
 
+
+def subsample_negatives(country, keep_ratio=1.5):
+    img_dir = Path(f"/content/rdd2020/train/{country}/images")
+    lbl_dir = Path(f"/content/rdd2020/train/{country}/labels")
+
+    pos_files = [f for f in lbl_dir.glob("*.txt") if f.stat().st_size > 0]
+    neg_files = [f for f in lbl_dir.glob("*.txt") if f.stat().st_size == 0]
+
+    n_keep = int(len(pos_files) * keep_ratio)
+    n_keep = min(n_keep, len(neg_files))
+    neg_to_drop = random.sample(neg_files, len(neg_files) - n_keep)
+
+    for f in neg_to_drop:
+        f.unlink()  # delete label file
+        img_path = img_dir / f"{f.stem}.jpg"
+        if img_path.exists():
+            img_path.unlink()  # delete matching image
+
+    print(f"{country}: kept {len(pos_files)} positive, {n_keep} negative, dropped {len(neg_to_drop)} negative")
 def query(data: Union[pd.DataFrame, Any]) -> str:
     """Request user input for some aspect of the data."""
     raise NotImplementedError
