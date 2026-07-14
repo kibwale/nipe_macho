@@ -79,17 +79,7 @@ convert_dataset(root, classes)
 
 ---
 
-## Using it in a notebook
 
-```python
-import access
-
-DRIVE_ROOT = "/content/rdd2020"
-TARGET_CLASSES = ["D40"]  # pothole only -> becomes class 0
-
-classes = access.convert_dataset(DRIVE_ROOT, TARGET_CLASSES)
-access.write_data_yaml(DRIVE_ROOT, classes)
-```
 
 ### Notes
 - `access.py` must be in your working directory (or on `sys.path`) for `import access` to work. If it lives elsewhere (e.g. Drive), add its folder first:
