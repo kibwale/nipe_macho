@@ -147,17 +147,22 @@ def convert_dataset(root, classes):
     return classes
 
 
-def write_data_yaml(root, classes, train_subdir="train/images", val_subdir="test/images"):
-    """Writing data.yaml for YOLO training."""
-    yaml_path = os.path.join(root, "data.yaml")
+
+from pathlib import Path
+
+def write_data_yaml(root, classes,train_subdir="train/images",  val_subdir="test/images", filename="data.yaml"):
+    """Write a YOLO data.yaml configuration file."""
+    root = Path(root)
+    yaml_path = root / filename
+
     with open(yaml_path, "w") as f:
-        f.write(f"train: {root}/{train_subdir}\n")
-        f.write(f"val: {root}/{val_subdir}\n")
+        f.write(f"train: {root / train_subdir}\n")
+        f.write(f"val: {root / val_subdir}\n")
         f.write(f"nc: {len(classes)}\n")
         f.write(f"names: {classes}\n")
+
     print(f"data.yaml written to {yaml_path}")
-
-
+   
 def data() -> Union[pd.DataFrame, None]:
     """
     Read the data from the web or local file, returning structured format such as a data frame.
