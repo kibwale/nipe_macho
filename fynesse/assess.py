@@ -143,46 +143,86 @@ def subsample_negatives(root, country, keep_ratio=1.5, seed=42):
         f"{n_keep} negatives kept, "
         f"{len(neg_to_drop)} negatives removed"
     )
-    
-def split_and_copy(
-    drive_root,
-    country,
-    final_train_img,
-    final_train_lbl,
-    final_val_img,
-    final_val_lbl,
-    val_ratio=0.15,
+
+def copy_split(
+    src_root,
+    src_split,
+    dst_root,
+    dst_split,
+    prefix="",
+    val_ratio=None,
+    seed=42,
 ):
     """
-    Split one country's images and labels into train and validation sets,
-    then copy them into the unified dataset directories.
+    Copying a YOLO dataset split into a unified destination dataset.
+
+    If val_ratio is None:
+        Copies the entire src_split as-is into dst_root/dst_split
+        (use this for datasets that are already pre-split, e.g. Roboflow's
+        train/valid/test).
+
+    If val_ratio is given:
+        Randomly splits src_split into train/val before copying, writing
+        results into dst_root/train and dst_root/val directly
+        (use this for datasets that need splitting, e.g. RDD2020's
+        per-country folders). dst_split is ignored in this mode.
     """
-    img_dir = Path(drive_root) / "train" / country / "images"
-    lbl_dir = Path(drive_root) / "train" / country / "labels"
+    src_img_dir = Path(src_root) / src_split / "images"
+    src_lbl_dir = Path(src_root) / src_split / "labels"
 
-    img_files = list(img_dir.glob("*.jpg"))
-    random.shuffle(img_files)
+    img_files = list(src_img_dir.glob("*.jpg"))
+    label_prefix = f"{prefix}_" if prefix else ""
 
-    n_val = int(len(img_files) * val_ratio)
+    if val_ratio is None:
+        # Direct copy, no splitting
+        dst_img_dir = Path(dst_root) / dst_split / "images"
+        dst_lbl_dir = Path(dst_root) / dst_split / "labels"
+        dst_img_dir.mkdir(parents=True, exist_ok=True)
+        dst_lbl_dir.mkdir(parents=True, exist_ok=True)
 
-    train_files = img_files[n_val:]
-    val_files = img_files[:n_val]
+        count = 0
+        for f in img_files:
+            lbl = src_lbl_dir / f"{f.stem}.txt"
+            if not lbl.exists():
+                continue
+            shutil.copy(f, dst_img_dir / f"{label_prefix}{f.name}")
+            shutil.copy(lbl, dst_lbl_dir / f"{label_prefix}{f.stem}.txt")
+            count += 1
 
-    for f in train_files:
-        shutil.copy(f, final_train_img / f"{country}_{f.name}")
+        print(f"{prefix or src_split} -> {dst_split}: {count} images")
 
-        lbl = lbl_dir / f"{f.stem}.txt"
-        if lbl.exists():
-            shutil.copy(lbl, final_train_lbl / f"{country}_{f.stem}.txt")
+    else:
+        # Split into train/val, then copy each into its own destination
+        random.seed(seed)
+        random.shuffle(img_files)
 
-    for f in val_files:
-        shutil.copy(f, final_val_img / f"{country}_{f.name}")
+        n_val = int(len(img_files) * val_ratio)
+        val_files = img_files[:n_val]
+        train_files = img_files[n_val:]
 
-        lbl = lbl_dir / f"{f.stem}.txt"
-        if lbl.exists():
-            shutil.copy(lbl, final_val_lbl / f"{country}_{f.stem}.txt")
+        dst_train_img = Path(dst_root) / "train" / "images"
+        dst_train_lbl = Path(dst_root) / "train" / "labels"
+        dst_val_img = Path(dst_root) / "val" / "images"
+        dst_val_lbl = Path(dst_root) / "val" / "labels"
+        for d in [dst_train_img, dst_train_lbl, dst_val_img, dst_val_lbl]:
+            d.mkdir(parents=True, exist_ok=True)
 
-    print(f"{country}: {len(train_files)} train, {len(val_files)} val")
+        for f in train_files:
+            lbl = src_lbl_dir / f"{f.stem}.txt"
+            if not lbl.exists():
+                continue
+            shutil.copy(f, dst_train_img / f"{label_prefix}{f.name}")
+            shutil.copy(lbl, dst_train_lbl / f"{label_prefix}{f.stem}.txt")
+
+        for f in val_files:
+            lbl = src_lbl_dir / f"{f.stem}.txt"
+            if not lbl.exists():
+                continue
+            shutil.copy(f, dst_val_img / f"{label_prefix}{f.name}")
+            shutil.copy(lbl, dst_val_lbl / f"{label_prefix}{f.stem}.txt")
+
+        print(f"{prefix or src_split}: {len(train_files)} train, {len(val_files)} val")
+        
 def query(data: Union[pd.DataFrame, Any]) -> str:
     """Request user input for some aspect of the data."""
     raise NotImplementedError
