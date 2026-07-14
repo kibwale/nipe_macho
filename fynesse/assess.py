@@ -4,7 +4,7 @@ import logging
 import random
 from .config import *
 from . import access
-
+import shutil
 # Set up logging
 logger = logging.getLogger(__name__)
 
