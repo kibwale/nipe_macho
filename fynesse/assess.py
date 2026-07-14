@@ -99,24 +99,52 @@ def data() -> Union[pd.DataFrame, Any]:
 
 
 
-def subsample_negatives(country, keep_ratio=1.5):
-    img_dir = Path(f"/content/rdd2020/train/{country}/images")
-    lbl_dir = Path(f"/content/rdd2020/train/{country}/labels")
+from pathlib import Path
+
+
+def subsample_negatives(root, country, keep_ratio=1.5, seed=42):
+    """
+    Reduce the number of background-only images by randomly removing
+    excess negative samples while preserving all positive samples.
+
+    Parameters
+    ----------
+    root : str or Path
+        Root directory of the RDD2020 dataset.
+    country : str
+        Country subset (Japan, Czech, India).
+    keep_ratio : float
+        Number of negative samples to retain per positive sample.
+    seed : int
+        Random seed for reproducibility.
+    """
+
+    random.seed(seed)
+
+    img_dir = Path(root) / "train" / country / "images"
+    lbl_dir = Path(root) / "train" / country / "labels"
 
     pos_files = [f for f in lbl_dir.glob("*.txt") if f.stat().st_size > 0]
     neg_files = [f for f in lbl_dir.glob("*.txt") if f.stat().st_size == 0]
 
-    n_keep = int(len(pos_files) * keep_ratio)
-    n_keep = min(n_keep, len(neg_files))
+    n_keep = min(int(len(pos_files) * keep_ratio), len(neg_files))
     neg_to_drop = random.sample(neg_files, len(neg_files) - n_keep)
 
-    for f in neg_to_drop:
-        f.unlink()  # delete label file
-        img_path = img_dir / f"{f.stem}.jpg"
-        if img_path.exists():
-            img_path.unlink()  # delete matching image
+    for lbl in neg_to_drop:
+        lbl.unlink()
 
-    print(f"{country}: kept {len(pos_files)} positive, {n_keep} negative, dropped {len(neg_to_drop)} negative")
+        img = img_dir / f"{lbl.stem}.jpg"
+        if img.exists():
+            img.unlink()
+
+    print(
+        f"{country}: "
+        f"{len(pos_files)} positive, "
+        f"{n_keep} negatives kept, "
+        f"{len(neg_to_drop)} negatives removed"
+    )
+    
+
 def query(data: Union[pd.DataFrame, Any]) -> str:
     """Request user input for some aspect of the data."""
     raise NotImplementedError
