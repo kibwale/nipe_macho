@@ -60,6 +60,103 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+import xml.etree.ElementTree as ET
+import os
+from pathlib import Path
+
+
+def find_xml_dirs(root):
+    """Finding XML directories."""
+    xml_dirs = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        if os.path.basename(dirpath) == "xmls":
+            xml_dirs.append(dirpath)
+    return xml_dirs
+
+
+def convert_annotation(xml_path, txt_path, classes):
+    """Converting individual annotations."""
+    tree = ET.parse(xml_path)
+    root = tree.getroot()
+
+    size = root.find('size')
+    img_w = int(size.find('width').text)
+    img_h = int(size.find('height').text)
+
+    lines = []
+    for obj in root.findall('object'):
+        cls_name = obj.find('name').text
+        if cls_name not in classes:
+            continue  # drop non-target boxes
+        cls_id = classes.index(cls_name)
+
+        bbox = obj.find('bndbox')
+        xmin = float(bbox.find('xmin').text)
+        ymin = float(bbox.find('ymin').text)
+        xmax = float(bbox.find('xmax').text)
+        ymax = float(bbox.find('ymax').text)
+
+        x_center = ((xmin + xmax) / 2) / img_w
+        y_center = ((ymin + ymax) / 2) / img_h
+        w = (xmax - xmin) / img_w
+        h = (ymax - ymin) / img_h
+
+        lines.append(f"{cls_id} {x_center:.6f} {y_center:.6f} {w:.6f} {h:.6f}")
+
+    with open(txt_path, 'w') as f:
+        f.write("\n".join(lines))
+
+
+def convert_dataset(root, classes):
+    """Processing the entire dataset."""
+    xml_dirs = find_xml_dirs(root)
+    print(f"Found {len(xml_dirs)} annotation folders")
+
+    total_boxes = 0
+    total_images_with_boxes = 0
+
+    for xdir in xml_dirs:
+        annotations_dir = os.path.dirname(xdir)
+        country_dir = os.path.dirname(annotations_dir)
+        images_dir = os.path.join(country_dir, "images")
+        labels_dir = os.path.join(country_dir, "labels")
+        os.makedirs(labels_dir, exist_ok=True)
+
+        xml_files = list(Path(xdir).glob("*.xml"))
+        for xml_file in xml_files:
+            txt_path = os.path.join(labels_dir, xml_file.stem + ".txt")
+            try:
+                convert_annotation(xml_file, txt_path, classes)
+                if os.path.getsize(txt_path) > 0:
+                    total_images_with_boxes += 1
+                    with open(txt_path) as f:
+                        total_boxes += sum(1 for _ in f)
+            except Exception as e:
+                print(f"Error on {xml_file}: {e}")
+
+        if os.path.isdir(images_dir):
+            for img_file in Path(images_dir).glob("*.jpg"):
+                txt_path = os.path.join(labels_dir, img_file.stem + ".txt")
+                if not os.path.exists(txt_path):
+                    open(txt_path, 'w').close()
+
+        print(f"Converted {len(xml_files)} files in {country_dir}")
+
+    print(f"\nTotal boxes: {total_boxes}")
+    print(f"Images containing at least one target box: {total_images_with_boxes}")
+    return classes
+
+
+def write_data_yaml(root, classes, train_subdir="train/images", val_subdir="test/images"):
+    """Writing data.yaml for YOLO training."""
+    yaml_path = os.path.join(root, "data.yaml")
+    with open(yaml_path, "w") as f:
+        f.write(f"train: {root}/{train_subdir}\n")
+        f.write(f"val: {root}/{val_subdir}\n")
+        f.write(f"nc: {len(classes)}\n")
+        f.write(f"names: {classes}\n")
+    print(f"data.yaml written to {yaml_path}")
+
 
 def data() -> Union[pd.DataFrame, None]:
     """
