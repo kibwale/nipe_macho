@@ -322,6 +322,31 @@ def subsample_negatives(root, country, keep_ratio=1.5, seed=42):
         f"{len(neg_to_drop)} negatives removed"
     )
 
+import hashlib
+
+
+def file_hash(path):
+    """Computing an MD5 hash of a file's contents."""
+    return hashlib.md5(Path(path).read_bytes()).hexdigest()
+
+
+def check_train_val_overlap(final_root, sample_n=10):
+    """Checking for duplicate images between train and val by content hash —
+    catches data leakage from re-running merge/split scripts without
+    clearing the destination first."""
+    train_dir = Path(f"{final_root}/train/images")
+    val_dir = Path(f"{final_root}/val/images")
+
+    train_hashes = {file_hash(f): f for f in train_dir.glob("*")}
+    val_hashes = {file_hash(f): f for f in val_dir.glob("*")}
+
+    overlap = set(train_hashes) & set(val_hashes)
+    print(f"Duplicate images between train and val: {len(overlap)}")
+    for h in list(overlap)[:sample_n]:
+        print(train_hashes[h], val_hashes[h])
+
+    return overlap
+
 def copy_split(
     src_root,
     src_split,
