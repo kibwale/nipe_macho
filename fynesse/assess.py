@@ -130,7 +130,42 @@ def is_valid_label_line(parts):
         return True
     return False
 
+def plot_metric_row(df, metrics, figsize=(18, 5)):
+    """
+    Plotting one row of metric subplots.
+    `metrics` is a list of either:
+      (train_col, val_col, title)  -> plots both lines
+      (col, title)                  -> plots a single line
+    """
+    fig, axes = plt.subplots(1, len(metrics), figsize=figsize)
+    if len(metrics) == 1:
+        axes = [axes]
 
+    for ax, spec in zip(axes, metrics):
+        if len(spec) == 3:
+            train_col, val_col, title = spec
+            if train_col in df.columns and val_col in df.columns:
+                ax.plot(df["epoch"], df[train_col], label="train")
+                ax.plot(df["epoch"], df[val_col], label="val")
+                ax.set_title(title)
+                ax.set_xlabel("Epoch")
+                ax.legend()
+                ax.grid(alpha=0.3)
+            else:
+                ax.set_visible(False)
+        else:
+            col, title = spec
+            if col in df.columns:
+                ax.plot(df["epoch"], df[col], color="darkorange", marker='o', markersize=2)
+                ax.set_title(title)
+                ax.set_xlabel("Epoch")
+                ax.grid(alpha=0.3)
+            else:
+                ax.set_visible(False)
+
+    plt.tight_layout()
+    plt.show()
+    
 def is_box_or_polygon(final_root, splits=("train", "val"), expected_class_ids=(0,), verbose_n=20):
     """Checking every label file for structurally valid lines, correct
     class ids, and in-range coordinates. Handles both box-format (5 fields)
