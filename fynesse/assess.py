@@ -25,7 +25,28 @@ makes rure they are correctly labeled. How is the data indexed. Crete visualisat
 routines to assess the data (e.g. in bokeh). Ensure that date formats are correct
 and correctly timezoned."""
 
+def check_country(final_root, splits=("train", "val"), country_keyword="kenya", sample_n=5):
+    """Checking how many label files match a country keyword in each split,
+    and previewing a sample of filenames — useful for confirming a merge
+    actually landed the expected files before trusting downstream analysis."""
+    results = {}
 
+    for split in splits:
+        lbl_dir = Path(f"{final_root}/{split}/labels")
+        if not lbl_dir.exists():
+            print(f"{split}: folder not found at {lbl_dir}")
+            continue
+
+        all_files = list(lbl_dir.glob("*.txt"))
+        matched_files = [f for f in all_files if country_keyword.lower() in f.name.lower()]
+
+        print(f"{split}: {len(all_files)} total label files, "
+              f"{len(matched_files)} contain '{country_keyword}' (any case)")
+        print("Sample filenames:", [f.name for f in all_files[:sample_n]])
+
+        results[split] = {"total": len(all_files), "matched": len(matched_files)}
+
+    return results
 def data() -> Union[pd.DataFrame, Any]:
     """
     Load the data from access and ensure missing values are correctly encoded as well as
