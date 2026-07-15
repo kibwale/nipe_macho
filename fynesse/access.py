@@ -228,3 +228,57 @@ def data() -> Union[pd.DataFrame, None]:
         logger.error(f"Unexpected error loading data: {e}")
         print(f"Error loading data: {e}")
         return None
+
+
+def polygon_to_bbox(parts):
+    """Converting a polygon-format label line into an axis-aligned bounding box."""
+    cls = parts[0]
+    coords = list(map(float, parts[1:]))
+    xs = coords[0::2]
+    ys = coords[1::2]
+    x_min, x_max = min(xs), max(xs)
+    y_min, y_max = min(ys), max(ys)
+    x_center = (x_min + x_max) / 2
+    y_center = (y_min + y_max) / 2
+    w = x_max - x_min
+    h = y_max - y_min
+    return f"{cls} {x_center:.6f} {y_center:.6f} {w:.6f} {h:.6f}"
+
+
+def fix_polygon_labels(final_root, split, prefix="Kenya_"):
+    """Converting any polygon-format lines in a split's label files to
+    box format, in place. Only touches files matching the given prefix."""
+    lbl_dir = Path(f"{final_root}/{split}/labels")
+    fixed_count = 0
+    total_converted = 0
+
+    for f in lbl_dir.glob(f"{prefix}*.txt"):
+        if f.stat().st_size == 0:
+            continue
+        lines = f.read_text().strip().split("\n")
+        new_lines = []
+        changed = False
+        for line in lines:
+            parts = line.split()
+            if not parts:
+                continue
+            if len(parts) == 5:
+                new_lines.append(line)
+            elif len(parts) >= 7 and len(parts) % 2 == 1:
+                new_lines.append(polygon_to_bbox(parts))
+                changed = True
+                total_converted += 1
+        if changed:
+            f.write_text("\n".join(new_lines))
+            fixed_count += 1
+
+    print(f"{split}: fixed {fixed_count} files, converted {total_converted} polygon lines to boxes")
+    return fixed_count, total_converted
+
+
+def fix_polygon_labels_all_splits(final_root, splits=("train", "val"), prefix="Kenya_"):
+    """Running fix_polygon_labels across multiple splits."""
+    results = {}
+    for split in splits:
+        results[split] = fix_polygon_labels(final_root, split, prefix=prefix)
+    return results
