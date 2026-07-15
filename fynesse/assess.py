@@ -5,6 +5,9 @@ import random
 from .config import *
 from . import access
 import shutil
+import matplotlib.pyplot as plt
+from pathlib import Path
+from collections import defaultdict
 # Set up logging
 logger = logging.getLogger(__name__)
 
@@ -99,9 +102,115 @@ def data() -> Union[pd.DataFrame, Any]:
 
 
 
-from pathlib import Path
 
 
+def get_country(filename, countries=("Japan", "Czech", "India", "Kenya")):
+    """Matching a filename prefix to its country label."""
+    for c in countries:
+        if filename.startswith(c + "_"):
+            return c
+    return "Unknown"
+
+
+def collect_box_sizes(drive_root, splits=("train", "val"), countries=("Japan", "Czech", "India", "Kenya")):
+    """Collecting (width_pct, height_pct, area_pct) per box, plus matching country labels."""
+    sizes = []
+    countries_list = []
+
+    for split in splits:
+        lbl_dir = Path(f"{drive_root}/final/{split}/labels")
+        if not lbl_dir.exists():
+            continue
+        for f in lbl_dir.glob("*.txt"):
+            country = get_country(f.name, countries)
+            with open(f) as fh:
+                for line in fh:
+                    parts = line.split()
+                    if len(parts) != 5:
+                        continue
+                    _, xc, yc, w, h = map(float, parts)
+                    sizes.append((w * 100, h * 100, w * h * 100))
+                    countries_list.append(country)
+
+    return sizes, countries_list
+
+
+def print_size_summary(sizes):
+    """Printing overall width/height/area mean, min, max."""
+    widths = [s[0] for s in sizes]
+    heights = [s[1] for s in sizes]
+    areas = [s[2] for s in sizes]
+
+    print(f"Total pothole boxes (final dataset): {len(sizes)}")
+    print(f"Width  (% of image): mean={sum(widths)/len(widths):.1f}%, min={min(widths):.1f}%, max={max(widths):.1f}%")
+    print(f"Height (% of image): mean={sum(heights)/len(heights):.1f}%, min={min(heights):.1f}%, max={max(heights):.1f}%")
+    print(f"Area   (% of image): mean={sum(areas)/len(areas):.1f}%, min={min(areas):.1f}%, max={max(areas):.1f}%")
+
+    return widths, heights, areas
+
+
+def print_size_buckets(areas, small_thresh=1, large_thresh=9):
+    """Printing small/medium/large box counts by area %."""
+    small = sum(1 for a in areas if a < small_thresh)
+    medium = sum(1 for a in areas if small_thresh <= a < large_thresh)
+    large = sum(1 for a in areas if a >= large_thresh)
+
+    print(f"\nSmall boxes (<{small_thresh}% area):  {small} ({small/len(areas)*100:.1f}%)")
+    print(f"Medium boxes ({small_thresh}-{large_thresh}%):     {medium} ({medium/len(areas)*100:.1f}%)")
+    print(f"Large boxes (>{large_thresh}%):       {large} ({large/len(areas)*100:.1f}%)")
+
+    return {"small": small, "medium": medium, "large": large}
+
+
+def group_by_country(countries_list, areas):
+    """Grouping box areas by country into a dict of lists."""
+    by_country = defaultdict(list)
+    for c, a in zip(countries_list, areas):
+        by_country[c].append(a)
+    return by_country
+
+
+def print_country_breakdown(by_country):
+    """Printing per-country box counts, mean area, and % small boxes."""
+    print("\n--- Per-country box counts and mean area ---")
+    for c, vals in by_country.items():
+        print(f"{c}: {len(vals)} boxes, mean area={sum(vals)/len(vals):.2f}%, "
+              f"small={sum(1 for v in vals if v < 1)/len(vals)*100:.1f}%")
+
+
+def plot_area_histogram(areas):
+    """Plotting the overall box area distribution as a histogram."""
+    fig, ax = plt.subplots(figsize=(7, 5))
+    ax.hist(areas, bins=50, color='steelblue', edgecolor='black')
+    ax.set_xlabel("Box area (% of image)")
+    ax.set_ylabel("Count")
+    ax.set_title("Pothole box area distribution (all countries)")
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_width_vs_height(widths, heights):
+    """Plotting a width vs height scatter of all boxes."""
+    fig, ax = plt.subplots(figsize=(7, 5))
+    ax.scatter(widths, heights, alpha=0.3, s=8)
+    ax.set_xlabel("Width (% of image)")
+    ax.set_ylabel("Height (% of image)")
+    ax.set_title("Width vs Height of pothole boxes")
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_area_by_country(by_country):
+    """Plotting overlaid area density histograms, one per country."""
+    fig, ax = plt.subplots(figsize=(10, 6))
+    for c, vals in by_country.items():
+        ax.hist(vals, bins=30, alpha=0.5, label=c, density=True)
+    ax.set_xlabel("Box area (% of image)")
+    ax.set_ylabel("Density")
+    ax.set_title("Box area distribution by country")
+    ax.legend()
+    plt.tight_layout()
+    plt.show()
 def subsample_negatives(root, country, keep_ratio=1.5, seed=42):
     """
     Reduce the number of background-only images by randomly removing
