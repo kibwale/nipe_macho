@@ -15,7 +15,7 @@ import os
 import glob
 import random
 from IPython.display import display, Image
-from ultralytics import YOLO
+#from ultralytics import YOLO
 
 # Set up logging
 logger = logging.getLogger(__name__)
