@@ -130,7 +130,7 @@ def is_valid_label_line(parts):
         return True
     return False
 
-def plot_metric_row(df, metrics, figsize=(18, 5)):
+def plot_row(df, metrics, figsize=(18, 5)):
     """
     Plotting one row of metric subplots.
     `metrics` is a list of either:
