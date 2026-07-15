@@ -11,6 +11,11 @@ This module handles question addressing functionality including:
 from typing import Any, Union
 import pandas as pd
 import logging
+import os
+import glob
+import random
+from IPython.display import display, Image
+from ultralytics import YOLO
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -104,3 +109,54 @@ def analyze_data(data: Union[pd.DataFrame, Any]) -> dict[str, Any]:
         logger.error(f"Error during data analysis: {e}")
         print(f"Error analyzing data: {e}")
         return {"error": str(e)}
+
+
+
+def load_trained_model(results_dir):
+    """Loading the best weights from a completed training run."""
+    best_weights = os.path.join(results_dir, 'weights', 'best.pt')
+    if not os.path.exists(best_weights):
+        raise FileNotFoundError(f"No best.pt found at {best_weights}")
+    print(f"Loaded model from: {best_weights}")
+    return YOLO(best_weights)
+
+
+def run_inference(model, test_images_path, conf=0.25, save=True):
+    """Running prediction on a folder of test images."""
+    print(f"Running predictions on: {test_images_path}")
+    results = model.predict(source=test_images_path, save=save, conf=conf)
+    return results
+
+
+def find_latest_predict_dir(pattern='runs/detect/predict*'):
+    """Finding the most recently created prediction output folder."""
+    predict_dirs = glob.glob(pattern)
+    if not predict_dirs:
+        print("No prediction directory found. Check if model.predict() succeeded.")
+        return None
+    return max(predict_dirs, key=os.path.getmtime)
+
+
+def display_random_predictions(predict_dir, n=3, width=800):
+    """Displaying a random sample of predicted images from a prediction folder."""
+    if predict_dir is None:
+        return
+
+    predicted_images = glob.glob(f'{predict_dir}/*.jpg')
+    if not predicted_images:
+        print("No predicted images found inside the prediction folder.")
+        return
+
+    print(f"\n✅ --- Displaying Random Predictions from {predict_dir} ---")
+    sample_images = random.sample(predicted_images, min(n, len(predicted_images)))
+    for img_path in sample_images:
+        display(Image(filename=img_path, width=width))
+
+
+def predict_and_show(results_dir, test_images_path, conf=0.25, n_display=3):
+    """Running the full predict-and-visualize pipeline end to end."""
+    model = load_trained_model(results_dir)
+    run_inference(model, test_images_path, conf=conf)
+    latest_predict = find_latest_predict_dir()
+    display_random_predictions(latest_predict, n=n_display)
+    return model
