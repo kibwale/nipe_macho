@@ -121,8 +121,56 @@ def data() -> Union[pd.DataFrame, Any]:
         print(f"Error assessing data: {e}")
         return None
 
+def is_valid_label_line(parts):
+    """Checking whether a label line is a valid box (5 fields) or
+    valid polygon (class + even number of x,y pairs, so odd total count)."""
+    if len(parts) == 5:
+        return True
+    if len(parts) >= 7 and len(parts) % 2 == 1:
+        return True
+    return False
 
 
+def is_box_or_polygon(final_root, splits=("train", "val"), expected_class_ids=(0,), verbose_n=20):
+    """Checking every label file for structurally valid lines, correct
+    class ids, and in-range coordinates. Handles both box-format (5 fields)
+    and polygon-format (class + x,y pairs) lines correctly."""
+    bad_lines = []
+
+    for split in splits:
+        lbl_dir = Path(f"{final_root}/{split}/labels")
+        if not lbl_dir.exists():
+            continue
+        for f in lbl_dir.glob("*.txt"):
+            with open(f) as fh:
+                for i, line in enumerate(fh):
+                    parts = line.split()
+                    if not parts:
+                        continue
+
+                    if not is_valid_label_line(parts):
+                        bad_lines.append((f, i, f"{len(parts)} fields"))
+                        continue
+
+                    cls = int(parts[0])
+                    if cls not in expected_class_ids:
+                        bad_lines.append((f, i, f"unexpected class id {cls}"))
+
+                    coords = list(map(float, parts[1:]))
+                    if any(v < 0 or v > 1 for v in coords):
+                        bad_lines.append((f, i, "coordinate out of [0,1] range"))
+
+                    # box-only sanity check: width/height must be positive
+                    if len(parts) == 5:
+                        w, h = coords[2], coords[3]
+                        if w <= 0 or h <= 0:
+                            bad_lines.append((f, i, "zero/negative width or height"))
+
+    print(f"Found {len(bad_lines)} genuinely problematic label lines")
+    for f, i, reason in bad_lines[:verbose_n]:
+        print(f, i, reason)
+
+    return bad_lines
 
 
 def get_country(filename, countries=("Japan", "Czech", "India", "Kenya")):
