@@ -15,7 +15,7 @@ import os
 import glob
 import random
 from IPython.display import display, Image
-!pip install -q ultralytics
+
 from ultralytics import YOLO
 
 # Set up logging
@@ -148,7 +148,7 @@ def display_random_predictions(predict_dir, n=3, width=800):
         print("No predicted images found inside the prediction folder.")
         return
 
-    print(f"\n✅ --- Displaying Random Predictions from {predict_dir} ---")
+    print(f"\n --- Displaying Random Predictions from {predict_dir} ---")
     sample_images = random.sample(predicted_images, min(n, len(predicted_images)))
     for img_path in sample_images:
         display(Image(filename=img_path, width=width))
