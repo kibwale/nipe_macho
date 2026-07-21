@@ -61,6 +61,21 @@ def scores(runs, label_name):
         })
 
     return pd.DataFrame(summary)
+
+
+def plot_area_histogram_log(areas):
+    """Plotting the box area distribution on a log-scaled y-axis —
+    useful when small-box counts dwarf medium/large ones, since a linear
+    scale can make the medium/large bars nearly invisible."""
+    fig, ax = plt.subplots(figsize=(7, 5))
+    ax.hist(areas, bins=50, color='steelblue', edgecolor='black')
+    ax.set_yscale('log')
+    ax.set_xlabel("Box area (% of image)")
+    ax.set_ylabel("Count (log scale)")
+    ax.set_title("Pothole box area distribution (log-scaled)")
+    plt.tight_layout()
+    plt.show()
+    
 def plot_bar(df, x_col, metric="mAP50", title=None, pad=0.01, color=None, show_labels=True):
     """Plot a bar chart comparing a metric across experiments, with
     optional y-axis padding and value labels on top of bars."""
