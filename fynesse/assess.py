@@ -25,6 +25,84 @@ makes rure they are correctly labeled. How is the data indexed. Crete visualisat
 routines to assess the data (e.g. in bokeh). Ensure that date formats are correct
 and correctly timezoned."""
 
+def scores(runs, label_name):
+    """
+    Summarize the best-performing epoch for multiple YOLO training runs.
+
+    Parameters
+    ----------
+    runs : dict
+        Dictionary mapping a label (e.g., image size or model name)
+        to the corresponding training run directory.
+    label_name : str
+        Name of the identifier column in the output
+        (e.g., 'imgsz' or 'model').
+
+    Returns
+    -------
+    pandas.DataFrame
+        Summary of the best epoch from each run.
+    """
+    summary = []
+
+    for label, path in runs.items():
+        df = pd.read_csv(f"{path}/results.csv")
+        df.columns = df.columns.str.strip()
+
+        best = df.loc[df["metrics/mAP50(B)"].idxmax()]
+
+        summary.append({
+            label_name: label,
+            "best_epoch": int(best["epoch"]),
+            "precision": best["metrics/precision(B)"],
+            "recall": best["metrics/recall(B)"],
+            "mAP50": best["metrics/mAP50(B)"],
+            "mAP50-95": best["metrics/mAP50-95(B)"],
+        })
+
+    return pd.DataFrame(summary)
+def plot_bar(df, x_col, metric="mAP50", title=None, pad=0.01, color=None, show_labels=True):
+    """Plot a bar chart comparing a metric across experiments, with
+    optional y-axis padding and value labels on top of bars."""
+    plt.figure(figsize=(7, 5))
+    plt.bar(df[x_col].astype(str), df[metric], color=color)
+
+    ymin = max(0, df[metric].min() - pad)
+    ymax = min(1, df[metric].max() + pad) if df[metric].max() <= 1 else df[metric].max() * 1.1
+    plt.ylim(ymin, ymax)
+
+    plt.xlabel(x_col.replace("_", " ").title())
+    plt.ylabel(metric)
+    plt.title(title or f"{metric} comparison")
+    plt.grid(axis="y", alpha=0.3)
+
+    if show_labels:
+        for i, v in enumerate(df[metric]):
+            plt.text(i, v, f"{v:.3f}" if v <= 1 else f"{v:.1f}", ha="center", va="bottom")
+
+    plt.show()
+def plot_metric_bar(df, x_col, metric="mAP50", title=None):
+    """
+    Plot a bar chart comparing a metric across experiments.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Summary dataframe.
+    x_col : str
+        Column used for the x-axis (e.g. 'imgsz' or 'model').
+    metric : str
+        Metric to plot.
+    title : str, optional
+        Plot title.
+    """
+    plt.figure(figsize=(7, 5))
+    plt.bar(df[x_col].astype(str), df[metric])
+    plt.xlabel(x_col.replace("_", " ").title())
+    plt.ylabel(metric)
+    plt.title(title or f"{metric} comparison")
+    plt.grid(axis="y", alpha=0.3)
+    plt.show()
 def check_country(final_root, splits=("train", "val"), country_keyword="kenya", sample_n=5):
     """Checking how many label files match a country keyword in each split,
     and previewing a sample of filenames — useful for confirming a merge
