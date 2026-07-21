@@ -15,7 +15,8 @@ import os
 import glob
 import random
 from IPython.display import display, Image
-
+import time
+from pathlib import Path
 from ultralytics import YOLO
 
 # Set up logging
@@ -36,6 +37,35 @@ logger = logging.getLogger(__name__)
 # import scipy.stats
 
 
+
+
+def measure_inference_time(weights_path, test_images_path, n_images=50, imgsz=800):
+    """Measuring average inference time (ms/image) for one model,
+    using Ultralytics' own speed breakdown for a cleaner, more accurate number
+    than wall-clock timing (which includes Python loop overhead)."""
+    model = YOLO(weights_path)
+    img_files = list(Path(test_images_path).glob("*.jpg"))[:n_images]
+
+    model.predict(img_files[0], imgsz=imgsz, verbose=False)  # warm-up, excluded
+
+    inference_times = []
+    for img in img_files:
+        results = model.predict(img, imgsz=imgsz, verbose=False)
+        inference_times.append(results[0].speed["inference"])
+
+    avg_ms = sum(inference_times) / len(inference_times)
+    return avg_ms
+
+
+def compare_inference_across_models(weights_paths, test_images_path, imgsz=800, n_images=50):
+    """Running measure_inference_time across multiple models at one imgsz."""
+    summary = []
+    for name, wpath in weights_paths.items():
+        avg_ms = measure_inference_time(wpath, test_images_path, n_images=n_images, imgsz=imgsz)
+        summary.append({"model": name, "avg_inference_ms": avg_ms})
+        print(f"{name}: {avg_ms:.2f} ms/image")
+
+    return pd.DataFrame(summary)
 def analyze_data(data: Union[pd.DataFrame, Any]) -> dict[str, Any]:
     """
     Address a particular question that arises from the data.
