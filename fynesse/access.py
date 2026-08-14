@@ -54,6 +54,11 @@ from typing import Any, Union
 import pandas as pd
 import logging
 import shutil
+import cv2
+import random
+import matplotlib.pyplot as plt
+from pathlib import Path
+
 # Set up basic logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -276,6 +281,77 @@ def fix_polygon_labels(final_root, split, prefix="Kenya_"):
     return fixed_count, total_converted
 
 
+
+def load_annotations(ROOT):
+    annotations = []
+
+    for split in ["train", "val", "test"]:
+        labels = ROOT / split / "labels"
+        images = ROOT / split / "images"
+
+        for label in labels.glob("*.txt"):
+            image = next(
+                (images / f"{label.stem}{ext}"
+                 for ext in [".jpg", ".jpeg", ".png", ".JPG", ".JPEG", ".PNG"]
+                 if (images / f"{label.stem}{ext}").exists()),
+                None
+            )
+
+            if image:
+                for line in open(label):
+                    _, xc, yc, w, h = map(float, line.split()[:5])
+                    annotations.append(
+                        (image, xc, yc, w, h, w * h * 100)
+                    )
+
+    return annotations
+
+
+def select_examples(annotations, targets, tolerance=0.25):
+    examples = []
+
+    for target in targets:
+        candidates = [
+            a for a in annotations
+            if abs(a[-1] - target) <= tolerance
+        ]
+        examples.append(random.choice(candidates) if candidates else None)
+
+    return examples
+
+
+def plot_examples(examples, targets):
+    fig, axes = plt.subplots(1, len(targets),
+                             figsize=(5 * len(targets), 5))
+
+    if len(targets) == 1:
+        axes = [axes]
+
+    for ax, target, example in zip(axes, targets, examples):
+
+        if example is None:
+            ax.set_title(f"{target}%\nNo example found")
+            ax.axis("off")
+            continue
+
+        image, xc, yc, w, h, area = example
+
+        img = cv2.cvtColor(cv2.imread(str(image)), cv2.COLOR_BGR2RGB)
+        H, W = img.shape[:2]
+
+        bw, bh = w * W, h * H
+        x, y = xc * W - bw / 2, yc * H - bh / 2
+
+        ax.imshow(img)
+        ax.add_patch(
+            plt.Rectangle((x, y), bw, bh,
+                          fill=False, linewidth=2)
+        )
+        ax.set_title(f"{target}% (actual: {area:.2f}%)")
+        ax.axis("off")
+
+    plt.tight_layout()
+    plt.show()
 def fix_polygon_labels_all_splits(final_root, splits=("train", "val"), prefix="Kenya_"):
     """Running fix_polygon_labels across multiple splits."""
     results = {}
